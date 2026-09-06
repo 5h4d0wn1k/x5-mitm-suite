@@ -1,0 +1,10 @@
+# Core is Python stdlib only (Linux, asyncio/select, sqlite3, sockets).
+# The suite runs and self-tests entirely offline without any of these.
+
+# Optional: full YAML config parsing.
+# Without PyYAML the built-in flat "key: value" subset loader is used.
+PyYAML>=6.0
+
+# Optional: scapy for advanced packet crafting/debugging.
+# The built-in raw AF_PACKET implementation is the default live path.
+#scapy>=2.5.0

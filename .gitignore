@@ -2,3 +2,12 @@ __pycache__/
 *.pyc
 *.pyo
 .DS_Store
+
+# runtime artifacts (never commit)
+logs/
+*.db
+*.db-journal
+captures/
+*.cap
+*.pcap
+*.pcapng

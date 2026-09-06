@@ -1,77 +1,142 @@
 # X5 — MITM and Spoofing Attack Suite
 
-Lab-only scripted local-network MITM attack toolkit implementing ARP spoof, DHCP starvation, DNS spoof, and SSL-strip with scapy-based offline simulation mode.
+Lab-only, own-network MITM toolkit implementing ARP spoof, DNS spoof, HTTP credential capture, and https-split (sslstrip-lite), with structured logging, a SQLite result store, a self-test that needs neither root nor a network, and a guaranteed-restore command.
 
 ## Overview
 
-This project demonstrates classic man-in-the-middle and spoofing attacks in a controlled lab environment:
-- **ARP Spoof + Credential Capture**: Poison ARP cache and sniff credentials from HTTP traffic
-- **DHCP Starvation**: Exhaust DHCP pool by flooding DISCOVER requests with random MACs
-- **DNS Spoof**: Redirect DNS resolution by spoofing responses for a target domain
-- **SSL-Strip Setup**: Downgrade HTTPS to HTTP by intercepting TLS handshakes
-- **Offline Simulation**: Replays sample frames as raw bytes to demonstrate detection logic without live traffic
+This project demonstrates classic man-in-the-middle and spoofing attacks in a controlled lab environment **against the network you own**:
+
+- **ARP Spoof + Credential Capture**: Poison the ARP cache between your own gateway and your own victim host
+- **DNS Spoof**: Redirect a chosen FQDN to a local fake resolver via iptables REDIRECT
+- **HTTP Credential Capture**: Transparent proxy that harvests form POSTs and Basic-auth credentials
+- **https-split**: sslstrip-lite mode (https→http redirect rewrite) + TLS-session detection
+- **Passive Monitor**: Observe ARP pairs / gratuitous announcements without inserting anything
+- **Guaranteed Restore**: `mitm restore` removes exactly the rules the suite added
+- **Offline Self-Test**: `mitm self-test` validates config, CLI, events, and the SQLite store — no root, no network, < 15s
+
+Everything is **dry-run by default**. Live operations require an explicit `--apply` flag and root, and are intended exclusively for networks you own.
 
 ## Features
 
-- **ARP Spoof Attack**: Gratuitous ARP reply injection to redirect traffic via attacker
-- **DHCP Starvation**: MAC-rotation starvation attack against local DHCP servers
-- **DNS Spoof**: Fake DNS A-record responses for arbitrary domains
-- **SSL-Strip**: HTTPS downgrade interception demonstration
-- **Simulation Mode**: Offline PCAP-equivalent frame replay for detection logic testing
-- **Consent Banner**: Loud "LAB RANGE" banner on every attack module requiring explicit arming
+- **`mitm arp`** — GRATUITOUS ARP reply injection (endless until SIGINT, or `--count N`)
+- **`mitm dns`** — local fake resolver answers `FQDN -> REDIRECT_IP`, forwarding all other queries to your lab upstream
+- **`mitm http`** — transparent HTTP credential-capture proxy (POST forms + Basic auth) fed by iptables REDIRECT
+- **`mitm https-split`** — 443 also redirected; TLS sessions logged as `tls_blocked`; plaintext 3xx `Location:` http-rewrite
+- **`mitm monitor`** — passive ARP observation (no insertion)
+- **`mitm restore`** — guaranteed cleanup of suite-added iptables rules + ip_forward restore
+- **`mitm metrics`** — captures/min and restore-reliability reporting from the SQLite store
+- **`mitm self-test`** — offline, rootless, networkless verification; exit code 0
+- **Consent Banner**: loud "LAB RANGE" banner; every live action requires the explicit `--apply` flag
 
 ## Installation
 
 ```bash
-# Scapy is optional — simulation mode works without it
-pip install scapy 2>/dev/null || true
+# Core is Python stdlib only (Linux). Optionally:
+pip install PyYAML   # full YAML config (built-in subset parser otherwise)
+# pip install scapy  # optional packet tooling (raw AF_PACKET is the default)
+
+# Install as a package (console script `mitm`):
+pip install .
+# or run without installing:
+python3 firmware/mitm_suite.py           # legacy entry (no args = self-test)
+PYTHONPATH=firmware python3 -m mitm_suite.cli ...
 ```
 
 ## Usage
 
+All commands are **dry-run by default** — they print the exact iptables/kernel
+
+operations they would perform and change nothing. Re-run with `--apply`
+
+(as root) only on your own lab AP + your own victim machine.
+
 ```bash
-# Dry-run simulation (default, no live traffic)
-python3 mitm_suite.py
+# Offline self-test (no root, no network):
+mitm self-test
 
-# Full simulation self-test (offline frames)
-python3 mitm_suite.py --simulate
+# ARP spoof preview (192.0.2.x = RFC 5737 documentation-lab placeholders):
+mitm arp --iface wlan0 --gateway 192.0.2.1 192.0.2.50
 
-# Live attack (requires --run flag AND lab network)
-python3 mitm_suite.py --run --target 192.168.1.0/24 --gateway 192.168.1.1
+# DNS spoof preview:
+mitm dns --iface wlan0 bank.lab 192.0.2.53
+
+# HTTP credential-capture proxy preview:
+mitm http --iface wlan0
+
+# https-split (also redirects 443) preview:
+mitm https-split --iface wlan0
+
+# Passive monitor preview:
+mitm monitor --iface wlan0 --duration 60
+
+# Restore preview, then the real guaranteed cleanup:
+mitm restore --dry-run
+sudo mitm restore
+
+# Metrics from the SQLite store:
+mitm metrics
 ```
 
-## Example Output
+### Live lab run (own AP + own victim only)
 
+```bash
+# 1. ARP spoof (ten reply-pair rounds, then stop):
+sudo mitm arp --iface wlan0 --gateway <lab-gw> --count 10 --apply <victim-ip>
+
+# 2. DNS spoof (endless until Ctrl+C, then auto-restore):
+sudo mitm dns --iface wlan0 --apply bank.lab <lab-landing-page-ip>
+
+# 3. HTTP credential capture (endless; Ctrl+C restores):
+sudo mitm http --iface wlan0 --apply
+
+# 4. Verify capture + restore state:
+mitm metrics
+sudo mitm restore --dry-run   # must show zero x5-mitm-suite rules
 ```
-============================================================
-  X5 — MITM & Spoofing Attack Suite (LAB ONLY)
-============================================================
 
-[!] LAB RANGE — Authorized testing only
-[!] Scapy available: True
+Configuration lives in `config/mitm.yaml` (defaults are documentation-lab
+placeholders only — replace them with your own lab values; never commit real
+IPs/MACs/SSIDs). Override with `--config`, or `MITM_CONFIG`. Logs go to
+`logs/mitm.log`, events as JSONL to `logs/mitm-events.jsonl`, captures to
+`logs/mitm.db`, and traffic to `captures/*.pcap` — all gitignored.
 
---- ARP Spoof Simulation ---
-  [LAB] Constructing gratuitous ARP reply for 192.168.1.100
-  [LAB] Simulated 5 ARP frames sent, 12 HTTP packets sniffed
-  [LAB] Extracted credential: admin / s3cretP@ss
+## Metrics
 
---- DHCP Starvation Simulation ---
-  [LAB] Generated 256 DISCOVER frames with random MACs
-  [LAB] Simulated DHCP OFFER count dropped to 0
-  [LAB] Pool exhaustion achieved after 256 requests
+The flagship video metric proves a live lab session out of artifacts:
 
---- DNS Spoof Simulation ---
-  [LAB] Intercepted DNS query for example.com
-  [LAB] Injected spoofed A-record: 10.0.0.99
-  [LAB] Simulated 8 queries redirected to attacker
+| Metric | Definition | Gate |
+|--------|-----------|------|
+| **captures/min** | credential-capture events logged per minute during an `http` run (`mitm metrics` reports it) | `>= 1` credential shown mid-run |
+| **restore reliability (20 restarts)** | run `arp`/`http`/`dns --apply`, SIGINT 20×; after each, `mitm restore --dry-run` reports **zero** `x5-mitm-suite` rules and `net.ipv4.ip_forward` returns to its prior value | 20/20 clean restores |
 
---- SSL Strip Simulation ---
-  [LAB] Intercepted HTTPS redirect for secure.example.com
-  [LAB] Stripped 302 redirect, downgraded to HTTP
-  [LAB] Simulated 4 page loads intercepted in plain text
+Record the metric on-screen (terminal showing `mitm metrics` + `mitm restore
+--dry-run` after each restart) and archive the video under `videos/`. Numbers
+land in `METRICS.md`.
 
-All simulations complete. No live traffic was generated.
-```
+## Live Lab Test Plan
+
+Prerequisites: your own AP (`lab-ap`), your own victim laptop, attacker host on
+the same lab network, root on the attacker.
+
+1. Baseline — note `net.ipv4.ip_forward` and `iptables -t nat -S PREROUTING | grep x5-mitm-suite` (must be empty).
+2. `mitm self-test` → exit 0 (offline gate).
+3. ARP: `arp --apply` toward the lab gateway + victim; from the victim verify its ARP table shows the attacker MAC for the gateway.
+4. DNS: `dns --apply bank.lab <landing>`; on the victim resolve `bank.lab` → landing IP; other names still resolve via the lab upstream.
+5. HTTP: `http --apply`; open our lab login page on the victim, submit; verify `credential_capture` in `logs/mitm-events.jsonl`, `mitm.db`, and the terminal.
+6. https-split: repeat with `https-split --apply`; verify 302 `Location:` is rewritten to http for plaintext flows and TLS sessions are logged `tls_blocked` (full decryption needs a MITM CA on the victim — out of scope).
+7. Restore: SIGINT the active session (or `sudo mitm restore`); verify step-1 baseline is unchanged.
+8. Metric run: capture/min over the session + **20 SIGINT restarts** with zero residual rules each (record to `METRICS.md`, video under `videos/`).
+
+## Safety / Restore Guarantee
+
+- **Dry-run by default.** Not one iptables rule is inserted, no ip_forward change, no packet is sent, unless `--apply` is given.
+- **Root required for live.** `--apply` without root aborts (exit 3).
+- **Marker-tagged rules only.** Every rule inserted carries the comment `x5-mitm-suite:<op>`. `mitm restore` deletes exactly those rules — never your own.
+- **State file.** On apply, the suite records the prior `net.ipv4.ip_forward` value and applied markers in `logs/.mitm-state.json` (gitignored); restore reads it and undoes precisely those changes, then clears it.
+- **SIGINT/SIGTERM restore-on-exit.** Any live session stops on Ctrl+C, runs restore, and exits cleanly. `atexit` runs the same cleanup as a safety net.
+- **Idempotent.** Restore is safe to run repeatedly and with nothing to undo.
+- **Endless modes** (`arp_count: 0`, `http`, `dns`, `monitor`) run until SIGINT, then restore — this is what the 20-restart metric exercises.
+- **iptables side effects** are limited to the `nat` table's `PREROUTING` chain on the chosen interface, plus a `net.ipv4.ip_forward` toggle only when the ARP mode needs relaying. Everything else is untouched.
 
 ## IMPORTANT: Read before use.
 

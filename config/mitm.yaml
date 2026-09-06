@@ -1,0 +1,32 @@
+# X5 MITM suite configuration.
+# DOCUMENTATION-LAB PLACEHOLDERS ONLY (RFC 5737 range 192.0.2.0/24).
+# Replace with your OWN lab values in a private copy — never commit real
+# IPs / MACs / SSIDs.
+
+gateway: 192.0.2.1          # lab AP gateway (own network only)
+target: 192.0.2.50          # lab victim host (own network only)
+iface: wlan0                # interface used for the lab run
+ssid: lab-ap                # metadata: own lab AP SSID
+
+# DNS
+dns_upstream: 192.0.2.53    # lab resolver used to forward non-spoofed queries
+dns_port: 5353              # local fake-resolver listen port
+
+# HTTP credential-capture proxy
+proxy_host: 0.0.0.0
+proxy_port: 8080
+
+# storage / logging (all paths are gitignored)
+db_path: logs/mitm.db
+log_path: logs/mitm.log
+events_path: logs/mitm-events.jsonl
+captures_dir: captures
+pcap_path: captures/mitm-capture.pcap
+pcap_enabled: true
+
+# ARP
+arp_interval: 2.0           # seconds between reply pairs (endless mode)
+arp_count: 0                # 0 = endless until SIGINT
+
+# metrics
+metrics_bucket_seconds: 60

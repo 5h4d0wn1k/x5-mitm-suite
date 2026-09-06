@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "x5-mitm-suite"
+version = "2.0.0"
+description = "X5 — MITM & Spoofing Attack Suite (LAB ONLY). Own-network lab tests only."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "5h4d0wn1k" }]
+keywords = ["network", "mitm", "lab", "security-research", "red-team"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+
+[project.scripts]
+mitm = "mitm_suite.cli:main"
+
+[project.optional-dependencies]
+yaml = ["PyYAML>=6.0"]       # full YAML support (built-in subset parser otherwise)
+scapy = ["scapy>=2.5.0"]     # optional advanced packet tooling (raw stdlib sockets used)
+
+[tool.setuptools]
+package-dir = { "" = "firmware" }
+packages = ["mitm_suite"]
