@@ -1,6 +1,10 @@
 """Parser tests: every subcommand, safety defaults, argument validation."""
 
+import os
+import sys
 import unittest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'firmware'))
 
 from mitm_suite import cli
 

@@ -1,9 +1,13 @@
 """Config tests: lab-placeholder defaults, YAML-subset + JSON parsing, validation."""
 
 import json
+import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'firmware'))
 
 from mitm_suite import config as config_mod
 from mitm_suite.config import ConfigError, load_config
