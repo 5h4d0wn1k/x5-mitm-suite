@@ -1,3 +1,9 @@
+> **⚠️ EDUCATIONAL USE ONLY — AUTHORIZED TESTING ONLY.**
+> This project exists for education, research, and **defense of systems you own
+> or hold explicit written authorization to assess**. Unauthorized use is
+> prohibited and may be illegal. Read [ETHICS.md](ETHICS.md) and
+> [SCOPE.md](SCOPE.md) before use. Use at your own risk; **AS IS**, no warranty.
+
 # X5 — MITM and Spoofing Attack Suite
 
 Lab-only, own-network MITM toolkit implementing ARP spoof, DNS spoof, HTTP credential capture, and https-split (sslstrip-lite), with structured logging, a SQLite result store, a self-test that needs neither root nor a network, and a guaranteed-restore command.
